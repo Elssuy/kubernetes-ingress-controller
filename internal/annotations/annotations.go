@@ -91,7 +91,8 @@ func IngressClassValidatorFunc(
 
 	return func(obj metav1.Object, handling ClassMatching) bool {
 		ingress := obj.GetAnnotations()[IngressClassKey]
-		return validIngress(ingress, ingressClass, handling)
+		knative := obj.GetAnnotations()[KnativeIngressClassKey]
+		return validIngress(ingress, ingressClass, handling) || validIngress(knative, ingressClass, handling)
 	}
 }
 
@@ -102,7 +103,8 @@ func IngressClassValidatorFuncFromObjectMeta(
 
 	return func(obj *metav1.ObjectMeta, handling ClassMatching) bool {
 		ingress := obj.GetAnnotations()[IngressClassKey]
-		return validIngress(ingress, ingressClass, handling)
+		knative := obj.GetAnnotations()[KnativeIngressClassKey]
+		return validIngress(ingress, ingressClass, handling) || validIngress(knative, ingressClass, handling)
 	}
 }
 

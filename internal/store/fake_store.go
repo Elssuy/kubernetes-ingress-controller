@@ -13,6 +13,7 @@ import (
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/annotations"
 	configurationv1 "github.com/kong/kubernetes-ingress-controller/v2/pkg/apis/configuration/v1"
 	configurationv1beta1 "github.com/kong/kubernetes-ingress-controller/v2/pkg/apis/configuration/v1beta1"
+	"github.com/sirupsen/logrus"
 )
 
 func keyFunc(obj interface{}) (string, error) {
@@ -65,7 +66,7 @@ func NewFakeStore(
 			return nil, err
 		}
 	}
-	ingressClassV1Store := cache.NewStore(keyFunc)
+	ingressClassV1Store := cache.NewStore(clusterResourceKeyFunc)
 	for _, ingress := range objects.IngressClassesV1 {
 		err := ingressClassV1Store.Add(ingress)
 		if err != nil {
@@ -173,6 +174,7 @@ func NewFakeStore(
 		ingressV1Beta1ClassMatching: annotations.ExactClassMatch,
 		ingressV1ClassMatching:      annotations.ExactClassMatch,
 		kongConsumerClassMatching:   annotations.ExactClassMatch,
+		logger:                      logrus.New(),
 	}
 	return s, nil
 }

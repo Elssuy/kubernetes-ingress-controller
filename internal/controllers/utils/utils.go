@@ -63,11 +63,6 @@ func GeneratePredicateFuncsForIngressClassFilter(name string, specCheckEnabled, 
 			if IsIngressClassSpecConfigured(obj, name) {
 				return true
 			}
-			if IsIngressClassSpecEmpty(obj) {
-				// we include Ingresses with _no_ ingressClassName in case we're handling the default IngressClass,
-				// and will filter them out if not in MatchesIngressClassName()
-				return true
-			}
 		}
 		return false
 	})
@@ -77,9 +72,6 @@ func GeneratePredicateFuncsForIngressClassFilter(name string, specCheckEnabled, 
 		}
 		if specCheckEnabled {
 			if IsIngressClassSpecConfigured(e.ObjectOld, name) || IsIngressClassSpecConfigured(e.ObjectNew, name) {
-				return true
-			}
-			if IsIngressClassSpecEmpty(e.ObjectOld) || IsIngressClassSpecEmpty(e.ObjectNew) {
 				return true
 			}
 		}
@@ -123,13 +115,22 @@ func IsIngressClassSpecConfigured(obj client.Object, expectedIngressClassName st
 	return false
 }
 
-// IsIngressClassSpecEmpty checks if a networking/v1 Ingress has no ingressClassName set
-func IsIngressClassSpecEmpty(obj client.Object) bool {
+// IsIngressClassEmpty returns true if an object has no ingress class information or false otherwise
+func IsIngressClassEmpty(obj client.Object) bool {
 	switch obj := obj.(type) {
 	case *netv1.Ingress:
-		return obj.Spec.IngressClassName == nil
-	default:
+		if _, ok := obj.GetAnnotations()[annotations.IngressClassKey]; !ok {
+			return obj.Spec.IngressClassName == nil
+		}
 		return false
+	default:
+		if _, ok := obj.GetAnnotations()[annotations.IngressClassKey]; ok {
+			return false
+		}
+		if _, ok := obj.GetAnnotations()[annotations.KnativeIngressClassKey]; ok {
+			return false
+		}
+		return true
 	}
 }
 
@@ -138,3 +139,37 @@ func CRDExists(client client.Client, gvr schema.GroupVersionResource) bool {
 	_, err := client.RESTMapper().KindFor(gvr)
 	return !meta.IsNoMatchError(err)
 }
+
+// ListClassless finds all objects of the given type without ingress class information
+//func ListClassless(obj client.Object) []reconcile.Request {
+//	ingresses := &netv1.IngressList{}
+//	if err := r.Client.List(context.Background(), ingresses); err != nil {
+//		r.Log.Error(err, "failed to list classless ingresses for default class")
+//		return nil
+//	}
+//	var recs []reconcile.Request
+//	for _, ingress := range ingresses.Items {
+//		if ingress.Spec.IngressClassName == nil {
+//			recs = append(recs, reconcile.Request{
+//				NamespacedName: types.NamespacedName{
+//					Namespace: ingress.Namespace,
+//					Name:      ingress.Name,
+//				},
+//			})
+//		}
+//	}
+//	return recs
+//}
+
+//func generateClasslessLister(list client.ObjectList, c client.Client) handler.MapFunc {
+//	var recs []reconcile.Request
+//	emptyMapFunc := func(obj client.Object) []reconcile.Request {
+//		return recs
+//	}
+//	if err := c.List(context.Background(), list); err != nil {
+//		return emptyMapFunc
+//	}
+//	if , ok := obj.(*netv1.IngressClass); ok {
+//	for _, obj := range list.Items {
+//	}
+//}

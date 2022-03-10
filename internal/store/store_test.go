@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kong/kubernetes-ingress-controller/v2/internal/annotations"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -12,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	netv1 "k8s.io/api/networking/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	networking "k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -200,4 +202,63 @@ spec:
 	_, exists, err = cs.Get(ing)
 	assert.NoError(t, err)
 	assert.True(t, exists)
+}
+
+func Test_getIngressClassHandling(t *testing.T) {
+	tests := []struct {
+		name string
+		objs FakeObjects
+		want annotations.ClassMatching
+	}{
+		{
+			name: "does not exist",
+			objs: FakeObjects{},
+			want: annotations.ExactClassMatch,
+		},
+		{
+			name: "not default",
+			objs: FakeObjects{
+				IngressClassesV1: []*networkingv1.IngressClass{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: annotations.DefaultIngressClass,
+						},
+						Spec: netv1.IngressClassSpec{
+							Controller: IngressClassKongController,
+						},
+					},
+				},
+			},
+			want: annotations.ExactClassMatch,
+		},
+		{
+			name: "default",
+			objs: FakeObjects{
+				IngressClassesV1: []*networkingv1.IngressClass{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: annotations.DefaultIngressClass,
+							Annotations: map[string]string{
+								"ingressclass.kubernetes.io/is-default-class": "true",
+							},
+						},
+						Spec: netv1.IngressClassSpec{
+							Controller: IngressClassKongController,
+						},
+					},
+				},
+			},
+			want: annotations.ExactOrEmptyClassMatch,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s, err := NewFakeStore(tt.objs)
+			require.NoError(t, err)
+			if got := s.(Store).getIngressClassHandling(); got != tt.want {
+				t.Errorf("s.getIngressClassHandling() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
